@@ -10,7 +10,7 @@ export function OnboardingShell({ title, children }: OnboardingShellProps) {
   return (
     <main className="flex min-h-svh items-center justify-center px-4 py-12">
       <div className="flex w-full max-w-md flex-col gap-5 rounded-xl bg-surface-1 p-8">
-        <QuiverMark className="size-7 text-primary" />
+        <QuiverMark className="size-11 text-primary" />
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {children}
       </div>

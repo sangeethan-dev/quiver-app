@@ -63,7 +63,12 @@ interface VaultActions {
   saveSettings(settings: Settings): Promise<void>;
 }
 
-type VaultContextValue = VaultActions & { state: VaultState };
+export interface LastCopy {
+  promptId: string;
+  at: number;
+}
+
+type VaultContextValue = VaultActions & { state: VaultState; lastCopy: LastCopy | null };
 
 const VaultContext = createContext<VaultContextValue | null>(null);
 
@@ -71,6 +76,7 @@ const VaultContext = createContext<VaultContextValue | null>(null);
 // neither selectors nor a dependency, and the Vault class holds the real logic.
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<VaultState>({ status: "loading" });
+  const [lastCopy, setLastCopy] = useState<LastCopy | null>(null);
   const folderRef = useRef<FileSystemDirectoryHandle | null>(null);
   const vaultRef = useRef<Vault | null>(null);
 
@@ -278,13 +284,21 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         try {
           await navigator.clipboard.writeText(text);
         } catch (error) {
-          const reason = error instanceof Error ? error.message : "The browser refused.";
+          const reason =
+            error instanceof DOMException && error.name === "NotAllowedError"
+              ? "The browser blocked the clipboard. Click the page and try again."
+              : error instanceof Error
+                ? error.message
+                : "The browser refused.";
           toast.error(`Couldn't copy. ${reason}`);
           return false;
         }
 
         toast("Prompt copied");
-        if (promptId) noteUse(promptId);
+        if (promptId) {
+          noteUse(promptId);
+          setLastCopy({ promptId, at: Date.now() });
+        }
         return true;
       },
 
@@ -340,7 +354,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     };
   }, [attempt, connect, noteUse, refresh, showSnapshot, writeUsage]);
 
-  const value = useMemo(() => ({ ...actions, state }), [actions, state]);
+  const value = useMemo(() => ({ ...actions, state, lastCopy }), [actions, state, lastCopy]);
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;
 }
 

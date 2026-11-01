@@ -51,10 +51,34 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Radix returns focus to a trigger, and these dialogs are opened from state, so
+  // without this focus falls to the page. That would send Ctrl+S to the browser
+  // after closing a dialog stacked on the editor.
+  const returnFocusTo = React.useRef<HTMLElement | null>(null)
+
+  function rememberFocus(event: Event) {
+    returnFocusTo.current = document.activeElement as HTMLElement | null
+    onOpenAutoFocus?.(event)
+  }
+
+  function restoreFocus(event: Event) {
+    onCloseAutoFocus?.(event)
+    if (event.defaultPrevented) return
+
+    // If another dialog opened as this one closed, focus belongs there.
+    const focusIsUnclaimed = document.activeElement === document.body
+    if (focusIsUnclaimed && returnFocusTo.current?.isConnected) {
+      event.preventDefault()
+      returnFocusTo.current.focus()
+    }
+  }
+
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -64,6 +88,8 @@ function DialogContent({
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
+        onOpenAutoFocus={rememberFocus}
+        onCloseAutoFocus={restoreFocus}
         {...props}
       >
         {children}

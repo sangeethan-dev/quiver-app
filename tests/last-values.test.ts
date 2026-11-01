@@ -37,6 +37,9 @@ describe("last values", () => {
     stored.set("quiver.values.abc123", "[1, 2]");
     expect(loadLastValues("abc123")).toEqual({});
 
+    stored.set("quiver.values.abc123", '["text"]');
+    expect(loadLastValues("abc123")).toEqual({});
+
     stored.set("quiver.values.abc123", "null");
     expect(loadLastValues("abc123")).toEqual({});
   });

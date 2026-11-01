@@ -30,7 +30,7 @@ export function EmptyVault({
       </div>
 
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-        <QuiverMark className="size-8 text-primary" />
+        <QuiverMark className="size-14 text-primary" />
         <div className="flex flex-col gap-1.5">
           <h1 className="text-lg font-semibold tracking-tight">Your quiver is empty</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">

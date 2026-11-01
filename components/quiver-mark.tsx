@@ -1,21 +1,16 @@
 import type { SVGProps } from "react";
 
-/** An arrow on the diagonal. The fletching sweeps back from the shaft, away from the head. */
+/** A slim quiver holding three arrows, seen by their notched feathers. One flat color. */
 export function QuiverMark(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M4 20 20 4" />
-      <path d="M13.5 4H20v6.5" />
-      <path d="M9.5 14.5H5m4.5 0V19" />
+    <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true" {...props}>
+      <g transform="rotate(14 32 32)">
+        <path d="M18.25 4 22 8.65 25.75 4v19h-7.5z" />
+        <path d="M28.25 3 32 7.65 35.75 3v20h-7.5z" />
+        <path d="M38.25 4 42 8.65 45.75 4v19h-7.5z" />
+        <path d="M17 26h30v3a3 3 0 0 1-3 3H20a3 3 0 0 1-3-3z" />
+        <path d="M20 34.5h24l-3.2 23a3 3 0 0 1-3 2.5H26.2a3 3 0 0 1-3-2.500z" />
+      </g>
     </svg>
   );
 }

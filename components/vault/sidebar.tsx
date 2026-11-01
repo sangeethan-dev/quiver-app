@@ -96,7 +96,7 @@ export function Sidebar({
   return (
     <nav aria-label="Filters" className="flex min-h-0 flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center gap-2 px-4">
-        <QuiverMark className="size-[18px] text-primary" />
+        <QuiverMark className="size-6 text-primary" />
         <span className="text-sm font-semibold tracking-tight">Quiver</span>
       </div>
 

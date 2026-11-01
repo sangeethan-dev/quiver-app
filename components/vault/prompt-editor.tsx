@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,6 +69,8 @@ export function PromptEditor({ session, models, knownTags, onClose, onSaved }: P
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
   const [saving, setSaving] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const dirty = tagText.trim() !== "" || !sameDraft(draft, original);
   const variables = useMemo(() => extractVariables(draft.body), [draft.body]);
@@ -136,6 +138,21 @@ export function PromptEditor({ session, models, knownTags, onClose, onSaved }: P
     if (pending?.kind === "restore") void restore(pending.version);
   }
 
+  // Without this, focus lands on the first tab button. A new prompt starts at the
+  // title; an existing one is usually opened to change the body.
+  function focusFirstField(event: Event) {
+    if (tab !== "edit") return;
+    event.preventDefault();
+
+    if (!base) {
+      titleRef.current?.focus();
+    } else if (bodyRef.current) {
+      const end = bodyRef.current.value.length;
+      bodyRef.current.focus();
+      bodyRef.current.setSelectionRange(end, end);
+    }
+  }
+
   function handleKeyDown(event: KeyboardEvent) {
     const isSave = event.key.toLowerCase() === "s" || event.key === "Enter";
     if (isSave && (event.ctrlKey || event.metaKey)) {
@@ -149,6 +166,7 @@ export function PromptEditor({ session, models, knownTags, onClose, onSaved }: P
       <Dialog open onOpenChange={(open) => !open && requestClose()}>
         <DialogContent
           onKeyDown={handleKeyDown}
+          onOpenAutoFocus={focusFirstField}
           className="flex h-[min(85svh,44rem)] max-w-[calc(100%-2rem)] flex-col sm:max-w-3xl"
         >
           <DialogHeader className="pr-8">
@@ -181,6 +199,7 @@ export function PromptEditor({ session, models, knownTags, onClose, onSaved }: P
             <>
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <Input
+                  ref={titleRef}
                   aria-label="Title"
                   placeholder="Verb · detail"
                   value={draft.title}
@@ -201,6 +220,7 @@ export function PromptEditor({ session, models, knownTags, onClose, onSaved }: P
                   />
                 </div>
                 <Textarea
+                  ref={bodyRef}
                   aria-label="Body"
                   placeholder="Write the prompt. Use {{name}} or {{name|default}} for parts you fill in each time."
                   value={draft.body}

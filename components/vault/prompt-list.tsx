@@ -1,5 +1,13 @@
 import { ArrowDownUpIcon, PlusIcon, SearchIcon, SettingsIcon, StarIcon } from "lucide-react";
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,6 +46,7 @@ const PromptRow = memo(function PromptRow({
     <li className="group relative">
       <button
         type="button"
+        data-prompt-row
         aria-current={selected || undefined}
         onClick={() => onSelect(prompt.id)}
         className={cn(
@@ -91,6 +100,7 @@ interface PromptRowsProps {
 function PromptRows({ prompts, models, selectedId, onSelect, onToggleFavorite }: PromptRowsProps) {
   const [limit, setLimit] = useState(ROW_BATCH);
   const sentinel = useRef<HTMLLIElement>(null);
+  const list = useRef<HTMLUListElement>(null);
 
   const selectedIndex = prompts.findIndex((prompt) => prompt.id === selectedId);
   const shown = Math.max(limit, selectedIndex + 1);
@@ -110,8 +120,15 @@ function PromptRows({ prompts, models, selectedId, onSelect, onToggleFavorite }:
     return () => observer.disconnect();
   }, [hasMore, shown]);
 
+  // Keep the selection in view as it moves, and take focus with it if a row had it.
+  useEffect(() => {
+    const row = list.current?.querySelector<HTMLElement>("[data-prompt-row][aria-current]");
+    row?.scrollIntoView({ block: "nearest" });
+    if (document.activeElement?.hasAttribute("data-prompt-row")) row?.focus();
+  }, [selectedId]);
+
   return (
-    <ul>
+    <ul ref={list}>
       {prompts.slice(0, shown).map((prompt) => (
         <PromptRow
           key={prompt.id}
@@ -137,6 +154,9 @@ interface PromptListProps {
   unreadable: readonly UnreadableFile[];
   settingsProblem?: string;
   filterMenu: ReactNode;
+  searchRef: RefObject<HTMLInputElement | null>;
+  onMoveSelection: (step: number) => void;
+  onCopySelected: () => void;
   onQueryChange: (query: string) => void;
   onSortChange: (sort: SortMode) => void;
   onSelect: (id: string) => void;
@@ -156,6 +176,9 @@ export function PromptList({
   unreadable,
   settingsProblem,
   filterMenu,
+  searchRef,
+  onMoveSelection,
+  onCopySelected,
   onQueryChange,
   onSortChange,
   onSelect,
@@ -167,6 +190,19 @@ export function PromptList({
   const searching = query.trim() !== "";
   const sortLabel = SORT_OPTIONS.find((option) => option.id === sort)?.label;
 
+  // The search box drives the list, so "type two letters, Enter" works here too.
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") onMoveSelection(1);
+    else if (event.key === "ArrowUp") onMoveSelection(-1);
+    else if (event.key === "Enter") onCopySelected();
+    else if (event.key === "Escape") {
+      if (query) onQueryChange("");
+      else event.currentTarget.blur();
+    } else return;
+
+    event.preventDefault();
+  }
+
   return (
     <section aria-label="Prompts" className="flex min-h-0 flex-col">
       <div className="flex h-12 shrink-0 items-center gap-1.5 px-3">
@@ -174,11 +210,13 @@ export function PromptList({
         <div className="relative min-w-0 flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchRef}
             type="search"
             aria-label="Search prompts"
             placeholder="Search"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
             className="h-8 pl-7"
           />
         </div>
