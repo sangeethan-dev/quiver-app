@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parsePromptFile, serializePromptFile, type Prompt } from "@/lib/prompt-file";
+import {
+  parsePromptFile,
+  sameBody,
+  serializePromptFile,
+  withLineEndingsOf,
+  type Prompt,
+} from "@/lib/prompt-file";
 
 const BRIEF_EXAMPLE = `---
 id: k3f9a2
@@ -243,6 +249,41 @@ describe("round trip", () => {
     const once = serializePromptFile(parse(BRIEF_EXAMPLE));
     const twice = serializePromptFile(parse(once));
     expect(twice).toBe(BRIEF_EXAMPLE);
+  });
+});
+
+describe("sameBody", () => {
+  it("ignores the difference between CRLF and LF", () => {
+    expect(sameBody("a\r\nb\r\n", "a\nb\n")).toBe(true);
+  });
+
+  it("sees real differences", () => {
+    expect(sameBody("a\nb", "a\nc")).toBe(false);
+    expect(sameBody("a\n", "a")).toBe(false);
+    expect(sameBody("a ", "a")).toBe(false);
+  });
+});
+
+describe("withLineEndingsOf", () => {
+  it("restores CRLF to an edit of a CRLF body", () => {
+    expect(withLineEndingsOf("a\r\nb\r\n", "a\nc\n")).toBe("a\r\nc\r\n");
+  });
+
+  it("doesn't double CRLF that is already there", () => {
+    expect(withLineEndingsOf("a\r\nb", "a\r\nc\nd")).toBe("a\r\nc\r\nd");
+  });
+
+  it("leaves an LF body as it is", () => {
+    expect(withLineEndingsOf("a\nb\n", "a\nc\n")).toBe("a\nc\n");
+  });
+
+  it("leaves a body with mixed endings as edited", () => {
+    expect(withLineEndingsOf("a\r\nb\nc", "x\ny")).toBe("x\ny");
+    expect(withLineEndingsOf("\na\r\n", "x\ny")).toBe("x\ny");
+  });
+
+  it("leaves a single-line original as edited", () => {
+    expect(withLineEndingsOf("a", "x\ny")).toBe("x\ny");
   });
 });
 

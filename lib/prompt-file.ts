@@ -142,6 +142,20 @@ export function parsePromptFile(text: string): ParseResult {
   return { ok: true, prompt: { ...meta, body, source } };
 }
 
+/**
+ * Browsers turn CRLF into LF in a textarea's value, so a body from a file saved by
+ * Notepad comes back from the editor looking changed. Only compare with this.
+ */
+export function sameBody(a: string, b: string): boolean {
+  return a.replace(/\r\n/g, "\n") === b.replace(/\r\n/g, "\n");
+}
+
+/** Gives an edited body the line endings of the original, if those were all CRLF. */
+export function withLineEndingsOf(original: string, edited: string): string {
+  const usesCrlf = original.includes("\r\n") && !/(^|[^\r])\n/.test(original);
+  return usesCrlf ? edited.replace(/\r?\n/g, "\r\n") : edited;
+}
+
 function sameValue(a: PromptMeta[keyof PromptMeta], b: PromptMeta[keyof PromptMeta]): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((value, index) => value === b[index]);
