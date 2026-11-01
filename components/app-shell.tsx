@@ -1,6 +1,7 @@
 "use client";
 
 import { ChooseFolder } from "@/components/onboarding/choose-folder";
+import { LoadingScreen } from "@/components/onboarding/loading-screen";
 import { MissingFolder, ReconnectFolder } from "@/components/onboarding/reconnect-folder";
 import { UnsupportedBrowser } from "@/components/onboarding/unsupported-browser";
 import { VaultScreen } from "@/components/vault/vault-screen";
@@ -11,7 +12,7 @@ function Screen() {
 
   switch (state.status) {
     case "loading":
-      return null;
+      return <LoadingScreen />;
     case "unsupported":
       return <UnsupportedBrowser />;
     case "welcome":

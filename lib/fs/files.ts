@@ -18,12 +18,18 @@ export function describeFileError(error: unknown): string {
       case "NotFoundError":
         return "The file or folder no longer exists.";
       case "NoModificationAllowedError":
+      case "InvalidStateError":
         return "The file is locked. Close any program using it and try again.";
       case "NotReadableError":
         return "The file couldn't be read. It may be in use or not fully synced.";
       case "QuotaExceededError":
         return "There isn't enough disk space.";
+      case "TypeMismatchError":
+        return "A file and a folder in the vault have the same name.";
+      case "AbortError":
+        return "The operation was interrupted. Try again.";
     }
+    return "The browser couldn't complete this. Try again.";
   }
   return error instanceof Error ? error.message : "Something went wrong.";
 }

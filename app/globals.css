@@ -102,8 +102,28 @@
   }
   html {
     @apply font-sans;
+    scrollbar-color: var(--input) transparent;
+    scrollbar-width: thin;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  /* Most controls draw a ring of their own; this covers anything that doesn't. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

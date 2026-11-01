@@ -189,10 +189,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       }
 
       folderRef.current = folder;
-      if ((await queryFolderPermission(folder)) === "granted") {
-        if (active) await connect(folder);
-      } else if (active) {
-        setState({ status: "reconnect", folderName: folder.name });
+      try {
+        if ((await queryFolderPermission(folder)) === "granted") {
+          if (active) await connect(folder);
+        } else if (active) {
+          setState({ status: "reconnect", folderName: folder.name });
+        }
+      } catch {
+        // A stored handle can stop working; choosing the folder again replaces it.
+        if (active) setState({ status: "welcome" });
       }
     }
 
