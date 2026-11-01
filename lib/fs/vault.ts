@@ -61,6 +61,11 @@ export type SaveResult =
   /** `disk` is null when the file is gone or can no longer be read. */
   | { status: "conflict"; disk: VaultEntry | null };
 
+export interface PromptUse {
+  count: number;
+  lastUsed: string;
+}
+
 export interface TrashedFile {
   fileName: string;
   title: string;
@@ -104,6 +109,20 @@ function isPromptFile(name: string): boolean {
 
 function sameTags(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((tag, index) => tag === b[index]);
+}
+
+function cleanDraft(draft: PromptDraft): PromptDraft {
+  const seen = new Set<string>();
+  const tags = draft.tags
+    .map((tag) => tag.trim())
+    .filter((tag) => {
+      const key = tag.toLowerCase();
+      if (!tag || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return { ...draft, title: draft.title.trim() || UNTITLED, tags };
 }
 
 function sameContent(a: PromptDraft, b: PromptDraft): boolean {
@@ -291,9 +310,8 @@ export class Vault {
       const taken = new Set(this.snapshot.entries.map(({ prompt }) => prompt.id));
       const now = localTimestamp();
       const prompt: Prompt = {
-        ...draft,
+        ...cleanDraft(draft),
         id: generateId(taken),
-        title: draft.title.trim() || UNTITLED,
         favorite: false,
         version: 1,
         created: now,
@@ -340,8 +358,7 @@ export class Vault {
 
       // Start from the disk so usage counts and hand-added fields survive the edit.
       const current = disk?.prompt ?? base.prompt;
-      const title = draft.title.trim() || UNTITLED;
-      const edited = { ...draft, title };
+      const edited = cleanDraft(draft);
 
       if (disk?.prompt && sameContent(current, edited)) {
         const snapshot = await this.scan();
@@ -359,7 +376,7 @@ export class Vault {
       const body = bodyChanged ? withLineEndingsOf(current.body, draft.body) : current.body;
       const updated = localTimestamp();
       const next: Prompt = { ...current, ...edited, body, version, updated };
-      const nextName = promptFileName(title, id);
+      const nextName = promptFileName(edited.title, id);
 
       // In this order, a failure part way can leave a spare copy but can't lose the prompt.
       await writeFile(this.root, nextName, serializePromptFile(next));
@@ -409,6 +426,46 @@ export class Vault {
       await writeFile(this.root, fileName, serializePromptFile({ ...disk.prompt, favorite }));
       return this.scan();
     });
+  }
+
+  /**
+   * Adds up copies made since the last write. Like favorites, this is applied to
+   * the current file, and neither counts as an edit to the prompt.
+   */
+  recordUse(uses: ReadonlyMap<string, PromptUse>): Promise<VaultSnapshot> {
+    return this.enqueue(async () => {
+      for (const [id, { count, lastUsed }] of uses) {
+        await this.patchFile(id, (prompt) => ({
+          ...prompt,
+          useCount: prompt.useCount + count,
+          lastUsed,
+        }));
+      }
+      return this.scan();
+    });
+  }
+
+  /** Points every prompt of one model at another, when a model is removed. */
+  reassignModel(from: string, to: string): Promise<VaultSnapshot> {
+    return this.enqueue(async () => {
+      const ids = this.snapshot.entries
+        .filter(({ prompt }) => prompt.model === from)
+        .map(({ prompt }) => prompt.id);
+
+      for (const id of ids) {
+        await this.patchFile(id, (prompt) => (prompt.model === from ? { ...prompt, model: to } : prompt));
+      }
+      return this.scan();
+    });
+  }
+
+  // A file that went away or was damaged since the last scan is skipped, not rewritten.
+  private async patchFile(id: string, change: (prompt: Prompt) => Prompt): Promise<void> {
+    const entry = this.snapshot.entries.find(({ prompt }) => prompt.id === id);
+    const disk = entry && (await this.readPrompt(entry.fileName));
+    if (entry && disk?.prompt) {
+      await writeFile(this.root, entry.fileName, serializePromptFile(change(disk.prompt)));
+    }
   }
 
   /** Returns the name in `_trash`, which is what an undo needs. */

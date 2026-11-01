@@ -3,7 +3,7 @@
 import { ChooseFolder } from "@/components/onboarding/choose-folder";
 import { MissingFolder, ReconnectFolder } from "@/components/onboarding/reconnect-folder";
 import { UnsupportedBrowser } from "@/components/onboarding/unsupported-browser";
-import { StorageScreen } from "@/components/vault/storage-screen";
+import { VaultScreen } from "@/components/vault/vault-screen";
 import { useVault, VaultProvider } from "@/lib/store";
 
 function Screen() {
@@ -27,7 +27,9 @@ function Screen() {
     case "missing":
       return <MissingFolder folderName={state.folderName} onChoose={() => void chooseFolder()} />;
     case "ready":
-      return <StorageScreen folderName={state.folderName} snapshot={state.snapshot} />;
+      return (
+        <VaultScreen key={state.folderName} folderName={state.folderName} snapshot={state.snapshot} />
+      );
   }
 }
 

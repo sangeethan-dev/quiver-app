@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-/** An arrow drawn on the diagonal, with two fletching strokes at the tail. */
+/** An arrow on the diagonal. The fletching sweeps back from the shaft, away from the head. */
 export function QuiverMark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -13,10 +13,9 @@ export function QuiverMark(props: SVGProps<SVGSVGElement>) {
       aria-hidden="true"
       {...props}
     >
-      <path d="M5 19 19 5" />
-      <path d="M12.5 5H19v6.5" />
-      <path d="M5 14v5h5" />
-      <path d="M8.5 10.5v5h5" />
+      <path d="M4 20 20 4" />
+      <path d="M13.5 4H20v6.5" />
+      <path d="M9.5 14.5H5m4.5 0V19" />
     </svg>
   );
 }

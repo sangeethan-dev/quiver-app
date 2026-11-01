@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createModel,
   DEFAULT_SETTINGS,
   FALLBACK_MODEL_COLOR,
   parseSettings,
@@ -19,6 +20,31 @@ describe("DEFAULT_SETTINGS", () => {
       "claude",
       "gemini",
     ]);
+  });
+});
+
+describe("createModel", () => {
+  it("makes an id from the name", () => {
+    expect(createModel("Local Llama", []).id).toBe("local-llama");
+  });
+
+  it("keeps the name as typed", () => {
+    expect(createModel("Local Llama", []).name).toBe("Local Llama");
+  });
+
+  it("avoids ids already in use", () => {
+    const existing = [
+      { id: "new-model", name: "A", color: "#000000" },
+      { id: "new-model-2", name: "B", color: "#000000" },
+    ];
+    expect(createModel("New model", existing).id).toBe("new-model-3");
+  });
+
+  it("gives successive models different colors", () => {
+    const first = createModel("A", []);
+    const second = createModel("B", [first]);
+    expect(first.color).not.toBe(second.color);
+    expect(first.color).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
 

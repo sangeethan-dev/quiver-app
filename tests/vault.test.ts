@@ -572,6 +572,120 @@ describe("setFavorite", () => {
   });
 });
 
+describe("recordUse", () => {
+  const use = (count: number, lastUsed = "2026-02-02T00:00:00+00:00") =>
+    new Map([["abc123", { count, lastUsed }]]);
+
+  it("adds to the count and sets the last used time", async () => {
+    await loaded();
+    const { entries } = await vault.recordUse(use(3));
+    expect(entries[0].prompt).toMatchObject({ useCount: 7, lastUsed: "2026-02-02T00:00:00+00:00" });
+  });
+
+  it("isn't an edit: no version and no change to updated", async () => {
+    await loaded();
+    const { entries } = await vault.recordUse(use(1));
+
+    expect(entries[0].prompt.updated).toBe("2026-01-01T00:00:00+00:00");
+    expect(entries[0].prompt.version).toBe(1);
+    expect(root.has("_history")).toBe(false);
+  });
+
+  it("keeps an outside edit that hasn't been rescanned yet", async () => {
+    await loaded();
+    root.put(FILE, promptText({ body: "Edited in Notepad\n" }));
+
+    await vault.recordUse(use(1));
+    expect(root.read(FILE)).toContain("Edited in Notepad");
+  });
+
+  it("doesn't start a conflict with an editor that's already open", async () => {
+    const entry = await loaded();
+    await vault.recordUse(use(1));
+
+    const { prompt } = saved(await vault.save(entry, draftOf(entry, { body: "Mine\n" }))).entry;
+    expect(prompt).toMatchObject({ body: "Mine\n", useCount: 5 });
+  });
+
+  it("skips a prompt that has gone, and still records the others", async () => {
+    await loaded();
+    await loaded(promptText({ id: "def456" }), "other--def456.md");
+    await root.removeEntry(FILE);
+
+    const uses = new Map([
+      ["abc123", { count: 1, lastUsed: "2026-02-02T00:00:00+00:00" }],
+      ["def456", { count: 1, lastUsed: "2026-02-02T00:00:00+00:00" }],
+    ]);
+    const { entries } = await vault.recordUse(uses);
+    expect(entries.map((entry) => entry.prompt.useCount)).toEqual([5]);
+  });
+
+  it("won't overwrite a damaged file", async () => {
+    await loaded();
+    root.put(FILE, "no longer a prompt");
+
+    await vault.recordUse(use(1));
+    expect(root.read(FILE)).toBe("no longer a prompt");
+  });
+});
+
+describe("reassignModel", () => {
+  it("moves only the prompts of that model", async () => {
+    await loaded();
+    await loaded(
+      promptText({ id: "def456" }).replace("model: claude", "model: gemini"),
+      "other--def456.md",
+    );
+
+    const { entries } = await vault.reassignModel("claude", "local");
+    expect(entries.map((entry) => entry.prompt.model).sort()).toEqual(["gemini", "local"]);
+  });
+
+  it("changes only the model line", async () => {
+    await loaded();
+    await vault.reassignModel("claude", "local");
+    expect(root.read(FILE)).toBe(promptText().replace("model: claude", "model: local"));
+  });
+
+  it("isn't a new version", async () => {
+    await loaded();
+    await vault.reassignModel("claude", "local");
+    expect(root.has("_history")).toBe(false);
+  });
+
+  it("leaves a prompt that was changed to another model outside the app", async () => {
+    await loaded();
+    root.put(FILE, promptText().replace("model: claude", "model: gemini"));
+
+    await vault.reassignModel("claude", "local");
+    expect(root.read(FILE)).toContain("model: gemini");
+  });
+});
+
+describe("tag cleanup", () => {
+  it("trims tags, removes blanks and removes repeats on create", async () => {
+    const { entry } = await vault.create({
+      title: "T",
+      model: "",
+      tags: [" a ", "", "  ", "A", "b", "a"],
+      body: "",
+    });
+    expect(entry.prompt.tags).toEqual(["a", "b"]);
+  });
+
+  it("does the same on save", async () => {
+    const entry = await loaded();
+    const { prompt } = saved(await vault.save(entry, draftOf(entry, { tags: ["x", " x ", ""] }))).entry;
+    expect(prompt.tags).toEqual(["x"]);
+  });
+
+  it("treats a tag list that only differs by blanks as unchanged", async () => {
+    const entry = await loaded();
+    saved(await vault.save(entry, draftOf(entry, { tags: ["one", ""] })));
+    expect(root.read(FILE)).toBe(promptText());
+  });
+});
+
 describe("trash", () => {
   it("moves the file, keeping its exact contents", async () => {
     const original = `﻿${promptText().replace(/\n/g, "\r\n")}`;

@@ -45,5 +45,8 @@ Quiver/
 vault/
 *.local.md
 
+# app code, not a prompt folder; Tailwind also skips gitignored paths
+!components/vault/
+
 # local tooling
 .claude/

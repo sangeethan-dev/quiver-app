@@ -1,3 +1,5 @@
+import { slugify } from "@/lib/slug";
+
 export interface ModelSetting {
   id: string;
   name: string;
@@ -23,7 +25,21 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const FALLBACK_MODEL_COLOR = "#7d8794";
 
+/** Offered to new models in turn. Each reaches 3:1 on every surface in both themes. */
+const NEW_MODEL_COLORS = ["#8a63d2", "#ab7612", "#cc4f86", "#0f8ea3", "#6f8a1f"];
+
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+export function createModel(name: string, existing: readonly ModelSetting[]): ModelSetting {
+  const base = slugify(name);
+  const ids = new Set(existing.map((model) => model.id));
+
+  let id = base;
+  for (let copy = 2; ids.has(id); copy++) id = `${base}-${copy}`;
+
+  const color = NEW_MODEL_COLORS[existing.length % NEW_MODEL_COLORS.length];
+  return { id, name, color };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

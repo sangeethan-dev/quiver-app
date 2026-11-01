@@ -24,12 +24,17 @@ import {
   Vault,
   type HistoryVersion,
   type PromptDraft,
+  type PromptUse,
   type SaveResult,
   type TrashedFile,
   type VaultEntry,
   type VaultSnapshot,
 } from "@/lib/fs/vault";
 import type { Settings } from "@/lib/settings";
+import { localTimestamp } from "@/lib/time";
+
+// Copying often in a row should write each file once, not once per copy.
+const USAGE_WRITE_DELAY_MS = 2000;
 
 export type VaultState =
   | { status: "loading" }
@@ -44,7 +49,11 @@ interface VaultActions {
   reconnect(): Promise<void>;
   refresh(): Promise<void>;
   createPrompt(draft: PromptDraft): Promise<VaultEntry | null>;
+  createPrompts(drafts: readonly PromptDraft[]): Promise<void>;
   savePrompt(base: VaultEntry, draft: PromptDraft, force?: boolean): Promise<SaveResult | null>;
+  /** Copies text. Passing a prompt id also counts it as a use of that prompt. */
+  copyText(text: string, promptId?: string): Promise<boolean>;
+  reassignModel(from: string, to: string): Promise<void>;
   setFavorite(id: string, favorite: boolean): Promise<void>;
   deletePrompt(id: string): Promise<void>;
   restoreFromTrash(fileName: string): Promise<void>;
@@ -131,6 +140,32 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     if (snapshot) showSnapshot(snapshot);
   }, [attempt, showSnapshot]);
 
+  const pendingUses = useRef(new Map<string, PromptUse>());
+  const usageTimer = useRef<number | undefined>(undefined);
+
+  const writeUsage = useCallback(async () => {
+    window.clearTimeout(usageTimer.current);
+    const uses = pendingUses.current;
+    if (uses.size === 0) return;
+
+    pendingUses.current = new Map();
+    const snapshot = await attempt("Couldn't update the usage count.", (vault) =>
+      vault.recordUse(uses),
+    );
+    if (snapshot) showSnapshot(snapshot);
+  }, [attempt, showSnapshot]);
+
+  const noteUse = useCallback(
+    (id: string) => {
+      const count = (pendingUses.current.get(id)?.count ?? 0) + 1;
+      pendingUses.current.set(id, { count, lastUsed: localTimestamp() });
+
+      window.clearTimeout(usageTimer.current);
+      usageTimer.current = window.setTimeout(() => void writeUsage(), USAGE_WRITE_DELAY_MS);
+    },
+    [writeUsage],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -168,6 +203,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
     const rescan = () => {
       if (document.visibilityState === "visible") void syncAfterFailure();
+      else void writeUsage(); // Leaving the page: don't wait for the timer.
     };
 
     window.addEventListener("focus", rescan);
@@ -176,7 +212,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", rescan);
       document.removeEventListener("visibilitychange", rescan);
     };
-  }, [ready, syncAfterFailure]);
+  }, [ready, syncAfterFailure, writeUsage]);
 
   const actions = useMemo<VaultActions>(() => {
     async function restoreFromTrash(fileName: string) {
@@ -190,7 +226,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       async chooseFolder() {
         try {
           const folder = await pickFolder();
-          if (folder) await connect(folder);
+          if (folder) {
+            await writeUsage();
+            await connect(folder);
+          }
         } catch (error) {
           toast.error(`Couldn't open the folder. ${describeFileError(error)}`);
         }
@@ -219,12 +258,41 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         return result.entry;
       },
 
+      async createPrompts(drafts) {
+        for (const draft of drafts) {
+          const result = await attempt("Couldn't create the prompt.", (vault) => vault.create(draft));
+          if (!result) return;
+          showSnapshot(result.snapshot);
+        }
+      },
+
       async savePrompt(base, draft, force = false) {
         const result = await attempt("Couldn't save the prompt.", (vault) =>
           vault.save(base, draft, { force }),
         );
         if (result?.status === "saved") showSnapshot(result.snapshot);
         return result;
+      },
+
+      async copyText(text, promptId) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "The browser refused.";
+          toast.error(`Couldn't copy. ${reason}`);
+          return false;
+        }
+
+        toast("Prompt copied");
+        if (promptId) noteUse(promptId);
+        return true;
+      },
+
+      async reassignModel(from, to) {
+        const snapshot = await attempt("Couldn't move the prompts.", (vault) =>
+          vault.reassignModel(from, to),
+        );
+        if (snapshot) showSnapshot(snapshot);
       },
 
       async setFavorite(id, favorite) {
@@ -270,7 +338,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         if (snapshot) showSnapshot(snapshot);
       },
     };
-  }, [attempt, connect, refresh, showSnapshot]);
+  }, [attempt, connect, noteUse, refresh, showSnapshot, writeUsage]);
 
   const value = useMemo(() => ({ ...actions, state }), [actions, state]);
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>;
