@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   assetPrefix: basePath,
   images: { unoptimized: true },
   trailingSlash: true,
-  env: { NEXT_PUBLIC_APP_VERSION: version },
+  env: { NEXT_PUBLIC_APP_VERSION: version, NEXT_PUBLIC_BASE_PATH: basePath },
   turbopack: {
     rules: {
       "*.css": {

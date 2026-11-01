@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SOURCE_FOLDERS = ["app", "components", "lib", "tests", "public", ".github"];
+const SOURCE_FOLDERS = ["app", "components", "lib", "tests", "public", "scripts", ".github"];
 
 function filesIn(folder: string): string[] {
   return readdirSync(folder, { withFileTypes: true, recursive: true })
